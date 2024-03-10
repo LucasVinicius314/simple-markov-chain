@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -12,57 +15,89 @@ import (
 )
 
 func main() {
-	inputPath := "../resources/input.txt"
-	outputPath := "../resources/chain.json"
+	inputFileName := "e.txt"
 
-	lines, err := util.ReadLines(inputPath)
+	inputBytes, err := util.ReadFile(fmt.Sprintf("../resources/input/%s", inputFileName))
 	if err != nil {
-		fmt.Printf("Error reading file: %v", err)
+		fmt.Printf("Error reading input file: %v\n", err)
 		return
 	}
 
-	tokens := []string{}
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(strings.ToLower(regexp.MustCompile(`\s+`).ReplaceAllString(line, " ")))
-		if trimmed == "" {
-			continue
-		}
-
-		tokens = append(tokens, strings.Split(trimmed, " ")...)
+	hashBytes := []byte{}
+	for _, v := range sha256.Sum256(inputBytes) {
+		hashBytes = append(hashBytes, v)
 	}
 
 	chain := map[string]*model.ChainEntry{}
 
-	lastToken := ""
-	for _, token := range tokens {
-		if lastToken == "" {
-			lastToken = token
-			continue
+	chainPath := fmt.Sprintf("../resources/output/%s.json", hex.EncodeToString(hashBytes))
+	if util.FileExists(chainPath) {
+		fmt.Printf("Loading chain [%s].\n", chainPath)
+
+		chainBytes, err := util.ReadFile(chainPath)
+		if err != nil {
+			fmt.Printf("Error reading chain file: %v\n", err)
+			return
 		}
 
-		if _, ok := chain[lastToken]; !ok {
-			chain[lastToken] = &model.ChainEntry{
-				Next:  map[string]int{},
-				Token: lastToken,
+		err = json.Unmarshal(chainBytes, &chain)
+		if err != nil {
+			fmt.Printf("Error unmarshaling chain: %v\n", err)
+			return
+		}
+	} else {
+		fmt.Printf("Generating chain from [%s].\n", inputFileName)
+
+		tokens := []string{}
+
+		lines := strings.Split(string(inputBytes), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(strings.ToLower(regexp.MustCompile(`\s+`).ReplaceAllString(line, " ")))
+			if trimmed == "" {
+				continue
 			}
+
+			tokens = append(tokens, strings.Split(trimmed, " ")...)
 		}
 
-		chain[lastToken].Next[token]++
+		lastToken := ""
+		for _, token := range tokens {
+			if lastToken == "" {
+				lastToken = token
+				continue
+			}
 
-		lastToken = token
+			if _, ok := chain[lastToken]; !ok {
+				chain[lastToken] = &model.ChainEntry{
+					Next:  map[string]int{},
+					Token: lastToken,
+				}
+			}
+
+			chain[lastToken].Next[token]++
+
+			lastToken = token
+		}
+
+		for _, v := range chain {
+			v.ComputeProbabilities()
+		}
+
+		err = util.SaveChain(chain, chainPath)
+		if err != nil {
+			fmt.Printf("Error saving chain [%s]: %v\n", chainPath, err)
+			return
+		}
 	}
 
-	for _, v := range chain {
-		v.ComputeProbabilities()
-	}
+	fmt.Println(generateOutput(chain))
+	fmt.Println(generateOutput(chain))
+	fmt.Println(generateOutput(chain))
+	fmt.Println(generateOutput(chain))
+	fmt.Println(generateOutput(chain))
+}
 
-	err = util.SaveChain(chain, outputPath)
-	if err != nil {
-		fmt.Printf("Error saving chain: %v", err)
-		return
-	}
-
+func generateOutput(chain map[string]*model.ChainEntry) string {
 	out := ""
 
 	keys := reflect.ValueOf(chain).MapKeys()
@@ -90,5 +125,5 @@ func main() {
 		}
 	}
 
-	fmt.Println(strings.TrimSpace(out))
+	return strings.TrimSpace(out)
 }
