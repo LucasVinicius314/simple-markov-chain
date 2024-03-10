@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -15,7 +17,16 @@ import (
 )
 
 func main() {
-	inputFileName := "e.txt"
+	dataFilePath := ``
+	if len(dataFilePath) > 0 {
+		err := parseDataFile(dataFilePath)
+		if err != nil {
+			fmt.Printf("Error parsing data file: %v\n", err)
+			return
+		}
+	}
+
+	inputFileName := "input.txt"
 
 	inputBytes, err := util.ReadFile(fmt.Sprintf("../resources/input/%s", inputFileName))
 	if err != nil {
@@ -95,6 +106,40 @@ func main() {
 	fmt.Println(generateOutput(chain))
 	fmt.Println(generateOutput(chain))
 	fmt.Println(generateOutput(chain))
+}
+
+type DataFileEntry struct {
+	Contents string `json:"Contents"`
+}
+
+func parseDataFile(filePath string) error {
+	fileBytes, err := util.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	dataFileEntries := []DataFileEntry{}
+	err = json.Unmarshal(fileBytes, &dataFileEntries)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create("../resources/output.txt")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+	for _, entry := range dataFileEntries {
+		_, err := w.WriteString(entry.Contents + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	w.Flush()
+
+	return nil
 }
 
 func generateOutput(chain map[string]*model.ChainEntry) string {
