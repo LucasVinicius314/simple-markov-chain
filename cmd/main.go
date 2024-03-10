@@ -132,7 +132,12 @@ func parseDataFile(filePath string) error {
 
 	w := bufio.NewWriter(file)
 	for _, entry := range dataFileEntries {
-		_, err := w.WriteString(entry.Contents + "\n")
+		trimmedLine := strings.TrimSpace(entry.Contents)
+		if trimmedLine == "" {
+			continue
+		}
+
+		_, err := w.WriteString(trimmedLine + "\n")
 		if err != nil {
 			return err
 		}
